@@ -6,7 +6,7 @@ import Markdown from 'markdown-to-jsx';
 const GREETING = {
   role: 'assistant',
   content:
-    'Hallo Klaus, ich bin eine KI, die auf die wirtschaftliche Debatte endliches vs unendliches Wachstum spezialisiert ist. Wie kann ich dir weiterhelfen?',
+    'Hallo Klaus, ich bin eine auf wirtschaftliche Theorien (endliches vs. unendliches Wachstum, Degrowth und post-Kapitalismus Utopien) spezialisierte KI. Wie kann ich dir helfen?',
 };
 
 export default function ChatPage() {
