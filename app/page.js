@@ -70,24 +70,16 @@ export default function ChatPage() {
 
       if (!response.ok) throw new Error('Request failed');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            role: 'assistant',
-            content: accumulated,
-            streaming: false,
-          };
-          return updated;
-        });
-      }
+      const { content } = await response.json();
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: 'assistant',
+          content,
+          streaming: false,
+        };
+        return updated;
+      });
     } catch {
       setMessages((prev) => {
         const updated = [...prev];

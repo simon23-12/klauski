@@ -128,13 +128,17 @@ function isQuotaError(err) {
   );
 }
 
-async function buildStream(genAI, modelName, history, lastContent) {
+async function buildResponse(genAI, modelName, history, lastContent) {
   const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      thinkingConfig: { thinkingBudget: 0 }, // disable thinking to avoid stream parse errors
+    },
   });
   const chat = model.startChat({ history });
-  return chat.sendMessageStream(lastContent);
+  const result = await chat.sendMessage(lastContent);
+  return result.response.text();
 }
 
 export async function POST(req) {
@@ -156,40 +160,19 @@ export async function POST(req) {
     }));
     const lastContent = messages[messages.length - 1].content;
 
-    let streamResult;
+    let content;
     try {
-      streamResult = await buildStream(genAI, PRIMARY_MODEL, history, lastContent);
+      content = await buildResponse(genAI, PRIMARY_MODEL, history, lastContent);
     } catch (primaryErr) {
       if (isQuotaError(primaryErr)) {
-        console.warn(`${PRIMARY_MODEL} unavailable (${primaryErr?.status ?? primaryErr?.message}), falling back to ${FALLBACK_MODEL}`);
-        streamResult = await buildStream(genAI, FALLBACK_MODEL, history, lastContent);
+        console.warn(`${PRIMARY_MODEL} unavailable, falling back to ${FALLBACK_MODEL}`);
+        content = await buildResponse(genAI, FALLBACK_MODEL, history, lastContent);
       } else {
         throw primaryErr;
       }
     }
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of streamResult.stream) {
-            // Gemini 2.5 Flash is a thinking model — reasoning chunks throw on .text().
-            // Catch and skip them; only enqueue actual output text.
-            let text = '';
-            try { text = chunk.text(); } catch { /* thinking chunk — skip */ }
-            if (text) controller.enqueue(encoder.encode(text));
-          }
-        } catch (err) {
-          console.error('Stream chunk error:', err);
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    });
+    return Response.json({ content });
   } catch (err) {
     console.error('Chat API error:', err);
     return Response.json({ error: 'Verarbeitungsfehler.' }, { status: 500 });
