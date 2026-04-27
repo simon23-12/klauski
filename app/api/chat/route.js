@@ -173,9 +173,14 @@ export async function POST(req) {
       async start(controller) {
         try {
           for await (const chunk of streamResult) {
-            const text = chunk.text();
+            // Gemini 2.5 Flash is a thinking model — reasoning chunks throw on .text().
+            // Catch and skip them; only enqueue actual output text.
+            let text = '';
+            try { text = chunk.text(); } catch { /* thinking chunk — skip */ }
             if (text) controller.enqueue(encoder.encode(text));
           }
+        } catch (err) {
+          console.error('Stream chunk error:', err);
         } finally {
           controller.close();
         }
